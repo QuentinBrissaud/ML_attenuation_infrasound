@@ -20,7 +20,7 @@ Figure: (from Brissaud et al, 2023) TL predicted by PE simulations (red), LP12 (
 See Python notebook "run_ML_attenuation.ipynb"
 
 ## Data
-You can collect the synthetic dataset and the deep learning model here: 10.6084/m9.figshare.22572577
+You can collect the synthetic dataset and the deep learning model here: http://dx.doi.org/10.6084/m9.figshare.22572577
 
 ## Paper 
 http://dx.doi.org/10.1093/gji/ggac307
