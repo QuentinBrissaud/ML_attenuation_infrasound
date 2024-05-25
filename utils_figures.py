@@ -24,7 +24,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 
-import compute_all_solutions, compute_numerical_solutions, build_machine_learning
+import build_machine_learning
 from skimage.transform import resize
 import time
 
@@ -224,21 +224,6 @@ def create_list_simulation_radial(file, azs, source_loc, nb_rad=10, max_range=10
     list_simulations.reset_index(drop=True, inplace=True)
     return list_simulations
     
-def create_list_simulations_atmos(output_dir, atmos_file, source_loc, nb_az=100, nb_rad=10,
-                                  nb_CPU=1, max_range=1000., step=100., rerun=True):
-
-    """
-    Create a list of slices from a given source location and a range of azimuths
-    """
-
-    ## Construct list_simulations dataframe
-    azs = np.linspace(0., 359., nb_az)
-    list_simulations = create_list_simulation_radial(atmos_file, azs, source_loc, nb_rad=nb_rad, max_range=max_range)
-    list_simulations = compute_numerical_solutions.create_profiles_CPUs(list_simulations, output_dir, 
-                                            nb_CPU=nb_CPU, max_range=max_range, 
-                                            step=step, rerun=rerun)
-
-    return list_simulations
 
 def ML_predict_radial_from_dataset(one_dataset, model, f0, output_dir, plot_error='RMSE', use_radial_plot=True, fontsize=12,
                                    vmin=-80., vmax=-30., vmin_TL=-120., vmax_TL=-10., error_min=2.5, error_max=20.,
@@ -570,114 +555,6 @@ def compute_probas_distrib(dataset, TL_vals=np.linspace(0., -200., 200), subsamp
     scores = np.array(scores)
     
     return dataset.distances[bins], TL_vals, scores.T
-
-def plot_map_and_distributions(dataset, dir_figures, range_lat = [-40., 70.], range_lon = [-150, 165.], 
-                               output_dir_existing='/adhocdata/infrasound/2021_seed_infrAI/model_atmos/',
-                               col_labels = {'1-15': 'troposphere (1-15 km)', '35-60': 'stratosphere (35-60 km)', '80-120': 'thermosphere (80-120 km)'},
-                               add_TL_distrib=True, figsize=(6.4, 6.2)):
-
-    """
-    Plot a map showing all profiles used in study + distributions of ceff, f0, and std
-    """
-
-    list_slices = read_slices(output_dir_existing)
-    alphabet = string.ascii_lowercase
-    iax = -1
-    h_map = 6
-    h_subplots = 2
-
-    ## Setup figure
-    fig = plt.figure(figsize=figsize); 
-    h_regular = 11
-    if add_TL_distrib:
-       h_regular += h_subplots+1
-    grid = fig.add_gridspec(h_regular, 2)
-    
-    ## Plot distribution of slices
-    print('Distribution slices')
-    iax += 1
-    ax_map = fig.add_subplot(grid[:h_map, :])
-    compute_all_solutions.plot_random_slices(range_lat, range_lon, list_slices, '', ax=ax_map)
-    ax_map.text(-0.075, 1.015, alphabet[iax]+')', ha='right', va='bottom', transform=ax_map.transAxes, 
-               bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-    
-    ## Plot distribution of veff
-    print('veff')
-    iax += 1
-    cols = ['veff-'+col for col in col_labels]
-    df_to_plot = convert_columns_to_rows(dataset.properties.loc[:, dataset.properties.columns.isin(cols)], column_name='veff', col_labels=col_labels, remove_cols=[])
-    ax_ceff = fig.add_subplot(grid[h_map:h_map+h_subplots, 0])
-    g = sns.kdeplot(data=df_to_plot, x="value", hue="layer", fill=True, common_norm=True, palette="rocket", alpha=.5, linewidth=0, ax=ax_ceff, legend=False)
-    #g.legend(bbox_to_anchor=(0., -1), ncol=1)
-    ax_ceff.text(-0.15, 1.0, alphabet[iax]+')', ha='right', va='top', transform=ax_ceff.transAxes, 
-               bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-    plt.setp(ax_ceff, yticks=[])
-    ax_ceff.set_ylabel('Distribution')
-    ax_ceff.set_xlabel('$\overline{{c}}_{eff}$', labelpad=0.1)
-    ax_ceff.minorticks_on()
-    
-    ## Plot distribution of std
-    print('std')
-    iax += 1
-    cols = ['std-'+col for col in col_labels]
-    df_to_plot = convert_columns_to_rows(dataset.properties.loc[:, dataset.properties.columns.isin(cols)], column_name='std', col_labels=col_labels, remove_cols=[])
-    ax_std = fig.add_subplot(grid[h_map:h_map+h_subplots, 1])
-    g = sns.kdeplot(data=df_to_plot, x="value", hue="layer", fill=True, common_norm=True, palette="rocket", alpha=.5, linewidth=0, ax=ax_std, legend=True)
-    move_legend(ax_std, "lower left", bbox_to_anchor=(0., -2.), frameon=False, format_legend='{nb}', convert_to_float=False)
-    ax_std.text(-0.05, 1.0, alphabet[iax]+')', ha='right', va='top', transform=ax_std.transAxes, 
-               bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-    plt.setp(ax_std, yticks=[])
-    ax_std.set_ylabel('')
-    ax_std.set_xlabel('Std of wind along range (m/s)')
-    ax_std.minorticks_on()
-    
-    ## Plot distribution of f0
-    print('f0')
-    iax += 1
-    ax_f0 = fig.add_subplot(grid[h_map+h_subplots+1:h_map+2*h_subplots+1, 0])
-    sns.kdeplot(data=dataset.properties, x="f0s", fill=True, common_norm=True, palette="rocket", alpha=.5, linewidth=0, ax=ax_f0, legend=False)
-    ax_f0.text(-0.15, 1.0, alphabet[iax]+')', ha='right', va='top', transform=ax_f0.transAxes, 
-               bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-    plt.setp(ax_f0, yticks=[])
-    ax_f0.set_ylabel('Distribution')
-    ax_f0.set_xlabel('Source frequency (Hz)', labelpad=0.1)
-    ax_f0.minorticks_on()
-    
-    ## Add TL distrib
-    if add_TL_distrib:
-        iax += 1
-        cmap = sns.diverging_palette(220, 20, as_cmap=True)
-        distances, TL_vals, scores = compute_probas_distrib(dataset, TL_vals=np.linspace(0., -200., 200), subsample=10, init_dist=10)
-        ax_TL = fig.add_subplot(grid[-h_subplots:, 0])
-        sc = ax_TL.pcolormesh(distances, TL_vals, scores, vmin=-10, vmax=-4., shading='auto', cmap=cmap);
-        axins = inset_axes(ax_TL, width="40%", height="12%", loc='lower left', bbox_to_anchor=(1.5, 0.45, 1., 1.), bbox_transform=ax_TL.transAxes, borderpad=0)
-        axins.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, bottom=False, left=False)
-        cbar = plt.colorbar(sc, cax=axins, orientation='horizontal', extend='both')
-        cbar.ax.set_xlabel('Log likelihood', labelpad=4.) 
-        cbar.ax.xaxis.tick_bottom()
-        cbar.ax.xaxis.set_label_position('top')
-        ax_TL.text(-0.15, 1.0, alphabet[iax]+')', ha='right', va='top', transform=ax_TL.transAxes, 
-                   bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-        ax_TL.set_ylabel('TL (db)')
-        ax_TL.set_xlabel('Distance (km)')
-        ax_TL.yaxis.tick_right()
-        ax_TL.yaxis.set_label_position('left')
-        ax_TL.minorticks_on()
-        ax_TL_s = ax_TL.secondary_yaxis("left")
-        ax_TL_s.tick_params(axis='both', which='both', labelleft=False)
-        ax_TL_s.minorticks_on()
-    
-        fig.align_ylabels([ax_ceff, ax_f0, ax_TL])
-    
-    ## Plot scheme ML
-    #iax += 1
-    #ax_scheme = fig.add_subplot(grid[3:, :])
-    #ax_ceff.text(-0.15, -1.015, alphabet[iax]+')', ha='right', va='bottom', transform=ax_ceff.transAxes, 
-    #           bbox=dict(facecolor='w', edgecolor='w', pad=0.1, alpha=0.5), fontsize=15., fontweight='bold')
-
-    fig.subplots_adjust(hspace=0.25)
-
-    plt.savefig(dir_figures + 'figure_map_scheme.pdf')
 
 def plot_convergence(model, output_dir, ax=None):
 
@@ -1444,6 +1321,25 @@ def compute_map_TL_veff(model, f0, deviation_from_f0=0.1, max_veff_tropo=1.05, m
         
     return simu_ids, np.array(all_TLs), np.array(all_TLs_true), np.array(winds)
     
+def read_RD_profiles(summary_file, model_dir):
+    
+    """
+    Read a list of vertical profiles from a summary plot
+    """
+
+    all_profiles = pd.DataFrame()
+    summary = pd.read_csv(model_dir + summary_file, delim_whitespace=True, header=None)
+    summary.columns = ['range', 'file']
+    for iprofile, profile_info in summary.iterrows():
+        file_profile = model_dir + profile_info.file
+        profile = pd.read_csv(file_profile, comment='#', header=None, delim_whitespace=True)
+        profile.columns = ['z', 'u', 'v', 't', 'rho', 'p']
+        profile['range'] = profile_info.range
+        all_profiles = all_profiles.append( profile )
+
+    all_profiles.reset_index(drop=True, inplace=True)
+    return all_profiles
+
 def determine_computational_cost(model, input_frequencies, max_profiles=10, coef_downsample=20, coef_upsample=4,
                                  simu_dir='/staff/quentin/Documents/Projects/ML_attenuation_prediction/computational_cost_data/slice_no_1301646/'):
 
@@ -1459,7 +1355,7 @@ def determine_computational_cost(model, input_frequencies, max_profiles=10, coef
     az_rad = np.radians(float(lines[5]))
     
     ## Retrieve profiles
-    profiles = compute_numerical_solutions.read_RD_profiles(summary_file, simu_dir)
+    profiles = read_RD_profiles(summary_file, simu_dir)
     ranges = profiles.range.unique()
     for irange, range_ in enumerate(ranges):
         one_profile = profiles.loc[profiles.range==range_]
